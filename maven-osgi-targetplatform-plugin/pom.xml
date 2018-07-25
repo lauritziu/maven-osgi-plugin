@@ -26,7 +26,7 @@
 		<dependency>
 			<groupId>at.bestsolution</groupId>
 			<artifactId>maven-osgi-targetplatform-lib</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>${project.version}</version>
 		</dependency>
 
 
