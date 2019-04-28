@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
@@ -33,7 +32,6 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 
 import at.bestsolution.maven.osgi.support.OsgiBundleVerifier;
@@ -99,7 +97,7 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 		
 		if( project.getPackaging().equals("jar") ) {
 			Path binary = project.getArtifact().getFile().toPath();
-			bundles.add(new Bundle(getOsgiVerifier().getManifest(project.getArtifact()).get(),binary));
+			bundles.add(new Bundle(getOsgiVerifier().getManifest(project.getArtifact().getFile().toPath()).get(),binary));
 		}
 		
 		Path p = Paths.get(System.getProperty("java.io.tmpdir")).resolve(project.getGroupId() + "-" + project.getArtifactId()).resolve(project.getArtifactId()).resolve("configuration");
@@ -223,7 +221,7 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 	
 	private Optional<Bundle> map(Artifact a) {
 		Path pathToArtifact = a.getFile().toPath();
-		return getOsgiVerifier().getManifest(a)
+		return getOsgiVerifier().getManifest(a.getFile().toPath())
 				.filter(MVNBaseOSGiLaunchPlugin::isBundle)
 				.map( m -> new Bundle(m, pathToArtifact));
 

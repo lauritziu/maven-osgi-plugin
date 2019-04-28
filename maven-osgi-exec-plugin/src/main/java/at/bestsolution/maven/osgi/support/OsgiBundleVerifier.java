@@ -39,7 +39,7 @@ final public class OsgiBundleVerifier {
     public boolean isBundle(Artifact artifact) {
         boolean isOsgi = false;
 
-        Optional<Manifest> manifest = getManifest(artifact);
+        Optional<Manifest> manifest = getManifest(artifact.getFile().toPath());
 
         if (manifest.isPresent()) {
             if (manifest.get().getMainAttributes().get(MANIFEST_SYMBOLIC_NAME) != null) {
@@ -50,9 +50,8 @@ final public class OsgiBundleVerifier {
         return isOsgi;
     }
 
-    public Optional<Manifest> getManifest(Artifact artifact) {
+    public Optional<Manifest> getManifest(Path pathToArtifact) {
 
-        Path pathToArtifact = artifact.getFile().toPath();
         Optional<Manifest> manifest = Optional.empty();
 
         if (Files.isDirectory(pathToArtifact)) {
@@ -70,12 +69,12 @@ final public class OsgiBundleVerifier {
         } else {
             try (JarFile f = new JarFile(pathToArtifact.toFile())) {
                 if (f.getManifest() == null) {
-                    logger.error("Can not process artifact " + formatArtifact(artifact) + ". Jar File of " + artifact.getFile() + " have no MANIFEST.MF");
+                    logger.error("Can not process artifact " + pathToArtifact + ". Have no MANIFEST.MF");
                 }
                 manifest = Optional.ofNullable(f.getManifest());
 
             } catch (IOException e) {
-                logger.error("Can not process artifact " + formatArtifact(artifact) + ". Jar File of " + artifact.getFile() + " can not be created");
+                logger.error("Can not process artifact " + pathToArtifact + ". Jar file can not be created from path to file.");
             }
         }
 
