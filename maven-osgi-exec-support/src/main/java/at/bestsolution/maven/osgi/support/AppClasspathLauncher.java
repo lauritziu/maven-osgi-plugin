@@ -1,11 +1,7 @@
-package at.bestsolution.maven.osgi.exec;
+package at.bestsolution.maven.osgi.support;
 
-import at.bestsolution.maven.osgi.support.OsgiBundleVerifier;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.shared.utils.cli.CommandLineException;
-import org.apache.maven.shared.utils.cli.CommandLineUtils;
-import org.codehaus.plexus.logging.console.ConsoleLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -28,9 +24,9 @@ public class AppClasspathLauncher {
     private static final String EQUINOX_LAUNCHER_MAIN_CLASS = "org.eclipse.equinox.launcher.Main";
 
     private static final String LF = System.getProperty("line.separator");
-    private final ConsoleLogger logger;
     private OsgiBundleVerifier osgiVerifier;
     private Set<Bundle> bundles;
+    private final static Logger logger = LoggerFactory.getLogger(AppClasspathLauncher.class);
 
     // external parameters: needs to be supprted
 
@@ -38,7 +34,7 @@ public class AppClasspathLauncher {
     protected List<String> programArguments;
     protected Properties vmProperties;
 //    @Parameter(property = "exec.args")
-    private List<String> commandlineArgs;
+    private List<String> commandLineArgs;
 
 
     /**
@@ -53,59 +49,15 @@ public class AppClasspathLauncher {
 
         AppClasspathLauncher launcher = new AppClasspathLauncher(Arrays.asList(args));
 
-        try {
-            launcher.execute();
-
-        } catch (CommandLineException e) {
-            e.printStackTrace();
-        }
-
+        launcher.execute();
     }
 
 
 
     public AppClasspathLauncher(List<String> commandLineArgs) {
 
-        // TODO: Hack hard code know parameters, replace this
-//<configuration>
-//					<programArguments>
-//						<programArgument>-console</programArgument>
-//						<programArgument>8999</programArgument>
-//						<programArgument>-consoleLog</programArgument>
-//						<programArgument>-product</programArgument>
-//						<programArgument>${app.product.id}</programArgument>
-//						<programArgument>-clearPersistedState</programArgument>
-//						<programArgument>-clean</programArgument>
-//
-//					</programArguments>
-//					<vmProperties>
-//						<property>
-//							<name>org.osgi.framework.bundle.parent</name>
-//							<value>ext</value>
-//						</property>
-//					</vmProperties>
-//					<startLevels>
-//						<org.eclipse.core.runtime>0</org.eclipse.core.runtime>
-//						<org.eclipse.equinox.common>2</org.eclipse.equinox.common>
-//						<org.eclipse.equinox.ds>2</org.eclipse.equinox.ds>
-//						<org.eclipse.equinox.event>2</org.eclipse.equinox.event>
-//						<org.eclipse.equinox.simpleconfigurator>1</org.eclipse.equinox.simpleconfigurator>
-//						<org.eclipse.osgi>-1</org.eclipse.osgi>
-//						<org.apache.servicemix.bundles.spring-beans>3</org.apache.servicemix.bundles.spring-beans>
-//						<org.apache.servicemix.bundles.spring-context>3</org.apache.servicemix.bundles.spring-context>
-//						<org.apache.servicemix.bundles.spring-core>3</org.apache.servicemix.bundles.spring-core>
-//						<org.eclipse.gemini.blueprint.extender>3</org.eclipse.gemini.blueprint.extender>
-//
-//						<!-- TODO: this is still ugly. Need a better way to mark the bundle
-//        as "to start" -->
-//						<com.zeiss.forum.viewer.core.service-impl>4</com.zeiss.forum.viewer.core.service-impl>
-//						<com.zeiss.forum.viewer.core.di>4</com.zeiss.forum.viewer.core.di>
-//						<!--<com.sun.tools.tools>4</com.sun.tools.tools> -->
-//					</startLevels>
-//				</configuration>
 
-
-        this.commandlineArgs = commandLineArgs;
+        this.commandLineArgs = commandLineArgs;
 
         programArguments = Arrays.asList(
                 "-console",
@@ -136,7 +88,6 @@ public class AppClasspathLauncher {
         vmProperties.put("org.osgi.framework.bundle.parent", "ext");
 
 
-        logger = new ConsoleLogger();
 
         bundles = findAllBundlesInClasspath();
         generateConfigIni();
@@ -193,7 +144,7 @@ public class AppClasspathLauncher {
     }
 
     @SuppressWarnings("Duplicates")
-    public void execute() throws CommandLineException {
+    public void execute() {
         Path ini = generateConfigIni();
 
         Optional<URL> launcherJar = bundles.stream()
@@ -239,9 +190,9 @@ public class AppClasspathLauncher {
         }
     }
 
-    private void appendCommandLineArgumentsTo(List<String> cmds) throws CommandLineException {
-        if (commandlineArgs != null) {
-            cmds.addAll(commandlineArgs);
+    private void appendCommandLineArgumentsTo(List<String> cmds)  {
+        if (commandLineArgs != null) {
+            cmds.addAll(commandLineArgs);
         }
     }
     //----------------------------------------
@@ -258,7 +209,7 @@ public class AppClasspathLauncher {
 
     private OsgiBundleVerifier getOsgiVerifier() {
         if (osgiVerifier == null) {
-            osgiVerifier = new OsgiBundleVerifier(logger);
+            osgiVerifier = new OsgiBundleVerifier();
         }
         return osgiVerifier;
     }
@@ -363,7 +314,7 @@ public class AppClasspathLauncher {
             Path pathToArtifact = Paths.get(uri);
 
             return getOsgiVerifier().getManifest(pathToArtifact)
-                    .filter(this::isBundle)
+                    .filter(osgiVerifier::isBundle)
                     .map(m -> new Bundle(m, pathToArtifact));
 
         } catch (URISyntaxException e) {
@@ -379,10 +330,6 @@ public class AppClasspathLauncher {
         return name.split(";")[0];
     }
 
-    private boolean isBundle(Manifest m) {
-        return m.getMainAttributes().getValue("Bundle-SymbolicName") != null;
-    }
-
 
     @SuppressWarnings("Duplicates")
     private Integer getStartLevel(Manifest m) {
@@ -390,6 +337,7 @@ public class AppClasspathLauncher {
         if (startLevels != null) {
             return startLevels.get(name);
         } else {
+            // default startlevels
             switch (name) {
                 case "org.eclipse.core.runtime":
                     return 4;

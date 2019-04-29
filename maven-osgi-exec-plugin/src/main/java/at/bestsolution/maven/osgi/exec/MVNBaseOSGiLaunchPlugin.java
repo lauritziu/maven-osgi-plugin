@@ -10,6 +10,14 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.exec;
 
+import at.bestsolution.maven.osgi.support.OsgiBundleVerifier;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.logging.Logger;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,23 +26,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
-
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.logging.Logger;
-
-import at.bestsolution.maven.osgi.support.OsgiBundleVerifier;
 
 public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 	private static final String LF = System.getProperty("line.separator");
@@ -68,7 +63,7 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 
 	private OsgiBundleVerifier getOsgiVerifier() {
 		if (osgiVerifier == null) {
-			osgiVerifier = new OsgiBundleVerifier(logger);
+			osgiVerifier = new OsgiBundleVerifier();
 		}
 		return osgiVerifier;
 	}
