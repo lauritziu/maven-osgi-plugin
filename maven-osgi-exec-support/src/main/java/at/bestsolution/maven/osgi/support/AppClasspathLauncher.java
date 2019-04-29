@@ -3,37 +3,32 @@ package at.bestsolution.maven.osgi.support;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.*;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
-import java.util.zip.ZipFile;
 
 public class AppClasspathLauncher {
+
     private static final String TMP_CONFIG_DIR_NAME = "eclipse.app.launcher";
     private static final String EQUINOX_LAUNCHER_MAIN_CLASS = "org.eclipse.equinox.launcher.Main";
 
-    private static final String LF = System.getProperty("line.separator");
-    private OsgiBundleVerifier osgiVerifier;
     private Set<Bundle> bundles;
     private final static Logger logger = LoggerFactory.getLogger(AppClasspathLauncher.class);
+
+    private OsgiBundleInfo osgiVerifier;
+    private ConfigIniGenerator configIniGenerator;
+    private BundleInfoGenerator bundleInfoGenerator;
 
     // external parameters: needs to be supprted
 
     protected Map<String, Integer> startLevels = new HashMap<>();
     protected List<String> programArguments;
     protected Properties vmProperties;
-//    @Parameter(property = "exec.args")
     private List<String> commandLineArgs;
 
 
@@ -89,63 +84,23 @@ public class AppClasspathLauncher {
 
 
 
+
+
         bundles = findAllBundlesInClasspath();
-        generateConfigIni();
-
-    }
-
-
-    @SuppressWarnings("Duplicates")
-    public Path generateConfigIni() {
-
 
         Path configPath = Paths.get(System.getProperty("java.io.tmpdir")).resolve(TMP_CONFIG_DIR_NAME).resolve("configuration");
 
-        Optional<Bundle> simpleConfigurator = bundles.stream()
-                .filter(b -> "org.eclipse.equinox.simpleconfigurator".equals(b.symbolicName)).findFirst();
+        configIniGenerator = new ConfigIniGenerator(configPath);
+        bundleInfoGenerator = new BundleInfoGenerator(configPath);
 
-        Optional<Bundle> equinox = bundles.stream().filter(b -> "org.eclipse.osgi".equals(b.symbolicName))
-                .findFirst();
-
-        try {
-            Files.createDirectories(configPath);
-        } catch (IOException e1) {
-            logger.error("Can not create directories for " + configPath);
-        }
-
-        if (simpleConfigurator.isPresent()) {
-            Path configIni = configPath.resolve("config.ini");
-            try (BufferedWriter writer = Files.newBufferedWriter(configIni, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-                Path bundlesInfo = generateBundlesInfo(configPath, bundles);
-
-                writer.append("osgi.bundles=" + toReferenceURL(simpleConfigurator.get()));
-                writer.append(LF);
-                writer.append("osgi.bundles.defaultStartLevel=4");
-                writer.append(LF);
-                writer.append("osgi.install.area=" + configPath.getParent().resolve("install").toUri().toString());
-                writer.append(LF);
-                writer.append("osgi.framework=" + equinox.get().path.toUri().toString());
-                writer.append(LF);
-                writer.append("eclipse.p2.data.area=@config.dir/.p2");
-                writer.append(LF);
-                writer.append("org.eclipse.equinox.simpleconfigurator.configUrl="
-                        + bundlesInfo.toAbsolutePath().toUri().toString());
-                writer.append(LF);
-                writer.append("osgi.configuration.cascaded=false");
-                writer.append(LF);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            throw new RuntimeException("Only 'org.eclipse.equinox.simpleconfigurator' is supported");
-        }
-
-        return configPath;
     }
+
 
     @SuppressWarnings("Duplicates")
     public void execute() {
-        Path ini = generateConfigIni();
+
+        Path bundleInfoPath = bundleInfoGenerator.generateBundlesInfo(bundles);
+        Path ini = configIniGenerator.generateConfigIni(bundles, bundleInfoPath);
 
         Optional<URL> launcherJar = bundles.stream()
                 .filter(bundle -> bundle.symbolicName.contains("org.eclipse.equinox.launcher"))
@@ -207,104 +162,13 @@ public class AppClasspathLauncher {
                 .collect(Collectors.toSet());
     }
 
-    private OsgiBundleVerifier getOsgiVerifier() {
+    private OsgiBundleInfo getOsgiVerifier() {
         if (osgiVerifier == null) {
-            osgiVerifier = new OsgiBundleVerifier();
+            osgiVerifier = new OsgiBundleInfo();
         }
         return osgiVerifier;
     }
 
-    @SuppressWarnings("Duplicates")
-    private String toReferenceURL(Bundle element) throws IOException {
-        StringBuilder w = new StringBuilder();
-        w.append("reference\\:" + element.path.toUri().toString());
-
-        if (element.startLevel != null) {
-            w.append("@" + element.startLevel + "\\:start");
-        } else {
-            w.append("@start");
-        }
-        return w.toString();
-    }
-
-
-
-    @SuppressWarnings("Duplicates")
-    private Path generateBundlesInfo(Path configurationDir, Set<Bundle> bundles) {
-        Path bundleInfo = configurationDir.resolve("org.eclipse.equinox.simpleconfigurator").resolve("bundles.info");
-        try {
-            Files.createDirectories(bundleInfo.getParent());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        try (BufferedWriter writer = Files.newBufferedWriter(bundleInfo, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            writer.append("#encoding=UTF-8");
-            writer.append(LF);
-            writer.append("#version=1");
-            writer.append(LF);
-
-            for (Bundle b : bundles) {
-                if ("org.eclipse.osgi".equals(b.symbolicName)) {
-                    continue;
-                }
-
-                writer.append(b.symbolicName);
-                writer.append("," + b.version);
-                writer.append(",file:" + generateLocalPath(b, configurationDir.resolve(".explode")).toString());
-                writer.append("," + b.startLevel); // Start Level
-                writer.append("," + b.autoStart); // Auto-Start
-                writer.append(LF);
-            }
-
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return bundleInfo;
-    }
-
-    @SuppressWarnings("Duplicates")
-    private Path generateLocalPath(Bundle b, Path explodeDir) {
-        if (b.dirShape && Files.isRegularFile(b.path)) {
-            Path p = explodeDir.resolve(b.symbolicName + "_" + b.version);
-            if (!Files.exists(p)) {
-                try (ZipFile z = new ZipFile(b.path.toFile())) {
-                    z.stream().forEach(e -> {
-                        Path ep = p.resolve(e.getName());
-                        if (e.isDirectory()) {
-                            try {
-                                Files.createDirectories(ep);
-                            } catch (IOException e1) {
-                                throw new RuntimeException(e1);
-                            }
-                        } else {
-                            if (!Files.exists(ep.getParent())) {
-                                try {
-                                    Files.createDirectories(ep.getParent());
-                                } catch (IOException e1) {
-                                    throw new RuntimeException(e1);
-                                }
-                            }
-                            try (OutputStream out = Files.newOutputStream(ep);
-                                 InputStream in = z.getInputStream(e)) {
-                                byte[] buf = new byte[1024];
-                                int l;
-                                while ((l = in.read(buf)) != -1) {
-                                    out.write(buf, 0, l);
-                                }
-                            } catch (IOException e2) {
-                                throw new RuntimeException(e2);
-                            }
-                        }
-                    });
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            return p;
-        }
-        return b.path.toAbsolutePath();
-    }
 
     private Optional<Bundle> mapToBundle(URL classpathEntry) {
         URI uri;
@@ -315,7 +179,7 @@ public class AppClasspathLauncher {
 
             return getOsgiVerifier().getManifest(pathToArtifact)
                     .filter(osgiVerifier::isBundle)
-                    .map(m -> new Bundle(m, pathToArtifact));
+                    .map(m -> new Bundle(m, pathToArtifact, getStartLevel(m)));
 
         } catch (URISyntaxException e) {
             logger.error("Classpath entry " + classpathEntry + " can not be transformed to URI", e);
@@ -325,15 +189,10 @@ public class AppClasspathLauncher {
         return Optional.empty();
     }
 
-    private static String bundleName(Manifest m) {
-        String name = m.getMainAttributes().getValue("Bundle-SymbolicName");
-        return name.split(";")[0];
-    }
-
 
     @SuppressWarnings("Duplicates")
     private Integer getStartLevel(Manifest m) {
-        String name = bundleName(m);
+        String name = OsgiBundleInfo.bundleName(m);
         if (startLevels != null) {
             return startLevels.get(name);
         } else {
@@ -369,27 +228,5 @@ public class AppClasspathLauncher {
         // TODO: support filtering
 
         return urls;
-    }
-    public class Bundle {
-        public final String symbolicName;
-        public final String version;
-        public final Integer startLevel;
-        public final Path path;
-        public final boolean dirShape;
-        public final boolean autoStart;
-
-        public Bundle(Manifest m, Path path) {
-            this(bundleName(m), m.getMainAttributes().getValue("Bundle-Version"), getStartLevel(m), path, getStartLevel(m) != null, "dir".equals(m.getMainAttributes().getValue("Eclipse-BundleShape")));
-        }
-
-        @SuppressWarnings("Duplicates")
-        public Bundle(String symbolicName, String version, Integer startLevel, Path path, boolean autoStart, boolean dirShape) {
-            this.symbolicName = symbolicName;
-            this.version = version;
-            this.startLevel = startLevel == null ? 4 : startLevel;
-            this.path = path;
-            this.autoStart = autoStart;
-            this.dirShape = dirShape;
-        }
     }
 }

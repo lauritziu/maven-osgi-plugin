@@ -10,7 +10,7 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.exec;
 
-import at.bestsolution.maven.osgi.support.OsgiBundleVerifier;
+import at.bestsolution.maven.osgi.support.OsgiBundleInfo;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugins.annotations.Component;
@@ -58,12 +58,12 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 	@Component
 	protected Logger logger;
 
-	private OsgiBundleVerifier osgiVerifier;
+	private OsgiBundleInfo osgiVerifier;
 
 
-	private OsgiBundleVerifier getOsgiVerifier() {
+	private OsgiBundleInfo getOsgiVerifier() {
 		if (osgiVerifier == null) {
-			osgiVerifier = new OsgiBundleVerifier();
+			osgiVerifier = new OsgiBundleInfo();
 		}
 		return osgiVerifier;
 	}

@@ -26,10 +26,15 @@ import java.util.jar.Manifest;
 /**
  * Provides utility methods to verifies {@link Artifact}'s whether they are OSGI bundles or not.
  */
-public final class OsgiBundleVerifier {
+public final class OsgiBundleInfo {
 
     private static final Attributes.Name MANIFEST_SYMBOLIC_NAME = new Attributes.Name("Bundle-SymbolicName");
-    private static final Logger logger = LoggerFactory.getLogger(OsgiBundleVerifier.class);
+    private static final Logger logger = LoggerFactory.getLogger(OsgiBundleInfo.class);
+
+    public static String bundleName(Manifest m) {
+        String name = m.getMainAttributes().getValue("Bundle-SymbolicName");
+        return name.split(";")[0];
+    }
 
     public Optional<Manifest> getManifest(Path pathToArtifact) {
 
