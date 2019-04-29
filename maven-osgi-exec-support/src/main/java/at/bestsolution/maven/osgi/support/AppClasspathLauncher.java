@@ -1,3 +1,13 @@
+/*******************************************************************************
+ * Copyright (c) 2019 Thomas Fahrmeyer.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *     Thomas Fahrmeyer - initial API and implementation
+ *******************************************************************************/
 package at.bestsolution.maven.osgi.support;
 
 import org.slf4j.Logger;
@@ -12,6 +22,9 @@ import java.util.*;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
+/**
+ * TODO
+ */
 public class AppClasspathLauncher {
 
     private static final String TMP_CONFIG_DIR_NAME = "eclipse.app.launcher";
@@ -27,7 +40,7 @@ public class AppClasspathLauncher {
     // external parameters: needs to be supprted
 
     protected Map<String, Integer> startLevels = new HashMap<>();
-    protected List<String> programArguments;
+    protected List<String> osgiRuntimeArguments;
     protected Properties vmProperties;
     private List<String> commandLineArgs;
 
@@ -54,7 +67,7 @@ public class AppClasspathLauncher {
 
         this.commandLineArgs = commandLineArgs;
 
-        programArguments = Arrays.asList(
+        osgiRuntimeArguments = Arrays.asList(
                 "-console",
                 "8999",
                 "-consoleLog",
@@ -68,8 +81,8 @@ public class AppClasspathLauncher {
         startLevels.put("org.eclipse.equinox.common", 2);
         startLevels.put("org.eclipse.equinox.ds", 2);
         startLevels.put("org.eclipse.equinox.event", 2);
-        startLevels.put("org.eclipse.equinox.simpleconfigurator", 1);
-        startLevels.put("org.eclipse.osgi", -1);
+        startLevels.put(Constants.SIMPLECONFIGURATOR_BUNDLE_NAME, 1);
+        startLevels.put(Constants.OSGI_FRAMEWORK_BUNDLE_NAME, -1);
         startLevels.put("org.apache.servicemix.bundles.spring-beans", 3);
         startLevels.put("org.apache.servicemix.bundles.spring-context", 3);
         startLevels.put("org.apache.servicemix.bundles.spring-core", 3);
@@ -118,7 +131,7 @@ public class AppClasspathLauncher {
         List<String> cmd = new ArrayList<>();
         cmd.add("-configuration");
         cmd.add("file:" + ini.toString());
-        cmd.addAll(programArguments);
+        cmd.addAll(osgiRuntimeArguments);
 
         appendCommandLineArgumentsTo(cmd);
 
@@ -145,14 +158,15 @@ public class AppClasspathLauncher {
         }
     }
 
+    //----------------------------------------
+    // private methods
+    //----------------------------------------
+
     private void appendCommandLineArgumentsTo(List<String> cmds)  {
         if (commandLineArgs != null) {
             cmds.addAll(commandLineArgs);
         }
     }
-    //----------------------------------------
-    // private methods
-    //----------------------------------------
 
     private Set<Bundle> findAllBundlesInClasspath() {
         return Arrays.asList(getClasspath()).stream()
@@ -206,9 +220,9 @@ public class AppClasspathLauncher {
                     return 2;
                 case "org.eclipse.equinox.event":
                     return 2;
-                case "org.eclipse.equinox.simpleconfigurator":
+                case Constants.SIMPLECONFIGURATOR_BUNDLE_NAME:
                     return 1;
-                case "org.eclipse.osgi":
+                case Constants.OSGI_FRAMEWORK_BUNDLE_NAME:
                     return -1;
                 default:
                     return null;

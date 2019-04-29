@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * Copyright (c) 2017 BestSolution.at and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *      Tom Schindl - initial Code
+ *      Thomas Fahrmeyer - refactored to its own class
+ *******************************************************************************/
 package at.bestsolution.maven.osgi.support;
 
 import java.io.BufferedWriter;
@@ -7,26 +18,36 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Objects;
 import java.util.Set;
 import java.util.zip.ZipFile;
 
+/**
+ * Generates the bundle.info file referencing all bundles to be used.
+ *
+ * Startlevels are extracted from Manifest.mf
+ */
 class BundleInfoGenerator {
 
     private Path configTargetPath;
 
+    /**
+     *
+     * @param configTargetPath pointing to an existing directory. This is a base directory for the directories created by
+     *                         this class
+     * @throws IllegalArgumentException for a path not pointing to a directory or to a resource does not exit.
+     */
     public BundleInfoGenerator(Path configTargetPath) {
+        Objects.nonNull(configTargetPath);
+        if (!configTargetPath.toFile().exists() || !configTargetPath.toFile().isDirectory()) {
+            throw new IllegalArgumentException("Path " + configTargetPath + " does not exists or is no directory");
+        }
 
         this.configTargetPath = configTargetPath;
     }
 
     public Path generateBundlesInfo(Set<Bundle> bundles) {
-        Path bundleInfo = configTargetPath.resolve("org.eclipse.equinox.simpleconfigurator").resolve("bundles.info");
-
-        try {
-            Files.createDirectories(bundleInfo.getParent());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        Path bundleInfo = configTargetPath.resolve(Constants.SIMPLECONFIGURATOR_BUNDLE_NAME).resolve("bundles.info");
 
         try (BufferedWriter writer = Files.newBufferedWriter(bundleInfo, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
             writer.append("#encoding=UTF-8");
@@ -35,7 +56,7 @@ class BundleInfoGenerator {
             writer.append(Constants.LF);
 
             for (Bundle b : bundles) {
-                if ("org.eclipse.osgi".equals(b.symbolicName)) {
+                if (Constants.OSGI_FRAMEWORK_BUNDLE_NAME.equals(b.symbolicName)) {
                     continue;
                 }
 

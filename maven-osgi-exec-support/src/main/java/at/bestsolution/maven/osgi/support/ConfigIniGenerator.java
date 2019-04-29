@@ -1,3 +1,14 @@
+/*****************************************************************************
+ * Copyright (c) 2017 BestSolution.at and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *      Tom Schindl - initial Code
+ *      Thomas Fahrmeyer - refactored to its own class
+ *******************************************************************************/
 package at.bestsolution.maven.osgi.support;
 
 import org.slf4j.Logger;
@@ -27,7 +38,7 @@ class ConfigIniGenerator {
         Optional<Bundle> simpleConfigurator = bundles.stream()
                 .filter(b -> "org.eclipse.equinox.simpleconfigurator".equals(b.symbolicName)).findFirst();
 
-        Optional<Bundle> equinox = bundles.stream().filter(b -> "org.eclipse.osgi".equals(b.symbolicName))
+        Optional<Bundle> equinox = bundles.stream().filter(b -> Constants.OSGI_FRAMEWORK_BUNDLE_NAME.equals(b.symbolicName))
                 .findFirst();
 
         try {
@@ -59,7 +70,7 @@ class ConfigIniGenerator {
                 throw new RuntimeException(e);
             }
         } else {
-            throw new RuntimeException("Only 'org.eclipse.equinox.simpleconfigurator' is supported");
+            throw new RuntimeException("Only '" + Constants.SIMPLECONFIGURATOR_BUNDLE_NAME + "' is supported");
         }
 
         return configIniTargetPath;
