@@ -1,0 +1,27 @@
+# configuration used in tests
+
+osgiRuntimeArguments:
+  -console 8999
+  -consoleLog
+  -product com.zeiss.forum.viewer.app.product
+  -clearPersistedState
+  -clean
+
+startLevels:
+  org.eclipse.core.runtime: 0
+  org.eclipse.equinox.common: 2
+  org.eclipse.equinox.ds: 2
+  org.eclipse.equinox.event: 2
+  org.eclipse.equinox.simpleconfigurator: 1
+  org.eclipse.osgi: -1
+  org.apache.servicemix.bundles.spring-beans: 3
+  org.apache.servicemix.bundles.spring-context: 3
+  org.apache.servicemix.bundles.spring-core: 3
+  org.eclipse.gemini.blueprint.extender: 3
+  com.zeiss.forum.viewer.core.service-impl: 4
+  com.zeiss.forum.viewer.core.di: 4
+  com.sun.tools.tools: 4
+
+vmProperties:
+  org.osgi.framework.bundle.parent: ext
+

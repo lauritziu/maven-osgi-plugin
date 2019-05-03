@@ -29,11 +29,12 @@ import java.util.jar.Manifest;
  */
 public final class OsgiBundleInfo {
 
-    private static final Attributes.Name MANIFEST_SYMBOLIC_NAME = new Attributes.Name("Bundle-SymbolicName");
+    public static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
+    private static final Attributes.Name MANIFEST_SYMBOLIC_NAME = new Attributes.Name(BUNDLE_SYMBOLIC_NAME);
     private static final Logger logger = LoggerFactory.getLogger(OsgiBundleInfo.class);
 
     public static String bundleName(Manifest m) {
-        String name = m.getMainAttributes().getValue("Bundle-SymbolicName");
+        String name = m.getMainAttributes().getValue(BUNDLE_SYMBOLIC_NAME);
         return name.split(";")[0];
     }
 

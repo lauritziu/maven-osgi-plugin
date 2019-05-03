@@ -1,0 +1,20 @@
+#
+# starts a osgi console which can be connected to via telnet on port 8999
+osgiRuntimeArguments:
+  -console 8999
+  -consoleLog
+  -product <your_eclipse_product_id>
+  -clearPersistedState  # for development
+  -clean                # for development
+
+startLevels:
+  org.eclipse.core.runtime: 0
+  org.eclipse.equinox.common: 2
+  org.eclipse.equinox.ds: 2
+  org.eclipse.equinox.event: 2
+  org.eclipse.equinox.simpleconfigurator: 1
+  org.eclipse.osgi: -1
+
+vmProperties:
+  org.osgi.framework.bundle.parent: ext
+

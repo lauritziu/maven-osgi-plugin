@@ -12,7 +12,13 @@ package at.bestsolution.maven.osgi.support;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.*;
@@ -23,12 +29,28 @@ import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 /**
+ * Should be used as main class for starting the Eclipse application from an IDE while developing.
+ * <p/>
+ * It generates bundle.info and config.ini file, launches the Equinox OSGI framework. The bundles are
+ * found by inspecting the app classpath. Each artifact (jar or path) identified as bundle will be considered.
+ * It works in the same way as the {@code maven-osgi-exec} plugin's, but not Maven runtime needs to be started first.
+ * <p/>
+ * Parameter configuration:
+ *
  * TODO
  */
 public class AppClasspathLauncher {
 
+    /** system property to specify the path to a config yaml file */
+    public static final String SYSPROP_CONFIG_FILE_PATH = "launcher.config.path";
+
+    private static final String LAUNCHER_ARGS_PREFIX = "-launcher.";
+
+    private static final String LAUNCHER_PRODUCT_ID_PARAM = LAUNCHER_ARGS_PREFIX + "product.id";
+
     private static final String TMP_CONFIG_DIR_NAME = "eclipse.app.launcher";
     private static final String EQUINOX_LAUNCHER_MAIN_CLASS = "org.eclipse.equinox.launcher.Main";
+    public static final String OSGI_PRODUCT_PARAM = "-product";
 
     private Set<Bundle> bundles;
     private final static Logger logger = LoggerFactory.getLogger(AppClasspathLauncher.class);
@@ -37,12 +59,15 @@ public class AppClasspathLauncher {
     private ConfigIniGenerator configIniGenerator;
     private BundleInfoGenerator bundleInfoGenerator;
 
+    private Configuration configuration;
+
     // external parameters: needs to be supprted
 
     protected Map<String, Integer> startLevels = new HashMap<>();
     protected List<String> osgiRuntimeArguments;
     protected Properties vmProperties;
     private List<String> commandLineArgs;
+    private Optional<Path> ymlConfigPath;
 
 
     /**
@@ -62,42 +87,19 @@ public class AppClasspathLauncher {
 
 
 
+    public AppClasspathLauncher() {
+        this(new ArrayList());
+    }
+
     public AppClasspathLauncher(List<String> commandLineArgs) {
+        defineConfigPath();
+        readConfiguration();
 
+        List<String> applicationCommandLineArgs = filterLauncherArgs(commandLineArgs);
+        configuration.setCommandLineArgs(applicationCommandLineArgs);
 
-        this.commandLineArgs = commandLineArgs;
-
-        osgiRuntimeArguments = Arrays.asList(
-                "-console",
-                "8999",
-                "-consoleLog",
-                "-product",
-                "com.zeiss.forum.viewer.app.product",
-                "-clearPersistedState",
-                "-clean");
-
-        startLevels = new HashMap<>();
-        startLevels.put("org.eclipse.core.runtime", 0);
-        startLevels.put("org.eclipse.equinox.common", 2);
-        startLevels.put("org.eclipse.equinox.ds", 2);
-        startLevels.put("org.eclipse.equinox.event", 2);
-        startLevels.put(Constants.SIMPLECONFIGURATOR_BUNDLE_NAME, 1);
-        startLevels.put(Constants.OSGI_FRAMEWORK_BUNDLE_NAME, -1);
-        startLevels.put("org.apache.servicemix.bundles.spring-beans", 3);
-        startLevels.put("org.apache.servicemix.bundles.spring-context", 3);
-        startLevels.put("org.apache.servicemix.bundles.spring-core", 3);
-        startLevels.put("org.eclipse.gemini.blueprint.extender", 3);
-//						<!-- TODO: this is still ugly. Need a better way to mark the bundle
-        startLevels.put("com.zeiss.forum.viewer.core.service-impl", 4);
-        startLevels.put("com.zeiss.forum.viewer.core.di", 4);
-        startLevels.put("com.sun.tools.tools", 4);
-
-        vmProperties = new Properties();
-        vmProperties.put("org.osgi.framework.bundle.parent", "ext");
-
-
-
-
+        Optional<String> customizedProductId = findProductIdFromCommandline(commandLineArgs);
+        customizedProductId.ifPresent(configuration::addProductId);
 
         bundles = findAllBundlesInClasspath();
 
@@ -106,6 +108,11 @@ public class AppClasspathLauncher {
         configIniGenerator = new ConfigIniGenerator(configPath);
         bundleInfoGenerator = new BundleInfoGenerator(configPath);
 
+    }
+
+
+    public Configuration getConfiguration() {
+        return configuration;
     }
 
 
@@ -161,6 +168,84 @@ public class AppClasspathLauncher {
     //----------------------------------------
     // private methods
     //----------------------------------------
+
+    private Optional<String> findProductIdFromCommandline(List<String> commandLineArgs) {
+
+        int index = commandLineArgs.indexOf(LAUNCHER_PRODUCT_ID_PARAM);
+        if (index != -1) {
+            return Optional.of(commandLineArgs.get(index + 1));
+        }
+
+        return Optional.empty();
+    }
+
+    private List<String> filterLauncherArgs(List<String> commandLineArgs) {
+        return commandLineArgs.stream().filter(arg -> !arg.startsWith(LAUNCHER_ARGS_PREFIX)).collect(Collectors.toList());
+    }
+
+
+    /**
+     * Determines the path to the config yaml path. A custom path can be defined by system property {@link #SYSPROP_CONFIG_FILE_PATH}.
+     * If that is not set a default config is used.
+     *
+     * @throws ConfigurationException if path to config file via system property {@link #SYSPROP_CONFIG_FILE_PATH} does not exist.
+     */
+    private void defineConfigPath() {
+        String pathProp = System.getProperty(SYSPROP_CONFIG_FILE_PATH);
+
+        if (pathProp == null) {
+            ymlConfigPath = Optional.empty();
+
+        } else {
+            Path configPath = Paths.get(pathProp);
+            if (!configPath.toFile().exists()) {
+                throw new ConfigurationException("Path to config path specified via system property '" + SYSPROP_CONFIG_FILE_PATH + "' does not exists.");
+
+            } else {
+                ymlConfigPath = Optional.of(configPath);
+            }
+        }
+
+    }
+
+    private Configuration readConfiguration() {
+        Yaml yaml = new Yaml(new Constructor(Configuration.class));
+
+        FileReader defaultConfigReader = useDefaultConfig();
+
+        Object config = null;
+
+        try (Reader fileReader = ymlConfigPath.map(this::useCustomConfigReader).orElse(defaultConfigReader);) {
+
+            config = yaml.load(fileReader);
+
+        } catch (IOException e) {
+            throw new ConfigurationException("Some problems reading the configuration has occured.", e);
+        }
+
+        configuration = (Configuration) config;
+
+        return configuration;
+    }
+
+    private FileReader useCustomConfigReader(Path path) {
+
+        FileReader reader = null;
+
+        try {
+            //noinspection IOResourceOpenedButNotSafelyClosed
+            reader = new FileReader(path.toFile());
+
+        } catch (FileNotFoundException e) {
+            logger.error("Path to custom config does not exist: " + path);
+        }
+
+        return reader;
+    }
+
+    private FileReader useDefaultConfig() {
+        return null;
+    }
 
     private void appendCommandLineArgumentsTo(List<String> cmds)  {
         if (commandLineArgs != null) {
@@ -243,4 +328,76 @@ public class AppClasspathLauncher {
 
         return urls;
     }
+
+    //----------------------------------------
+    // Configuration class filled with yaml configuration
+    //----------------------------------------
+    public static class Configuration {
+
+        private String osgiCommandLineArgs;
+        private Map<String, Integer> startLevels;
+        private Map<String, String> vmProperties;
+        private List<String> commandLineArgs;
+
+        /**
+         * Adds a osgiCommand line argument {@code -product} with the given product id that is to be started.
+         *
+         * @throws ConfigurationException is thrown if argument {@link #OSGI_PRODUCT_PARAM} is already defined in osgi
+         * command line args.
+         */
+        public void addProductId(String productId) {
+            if (osgiCommandLineArgs.contains(OSGI_PRODUCT_PARAM)) {
+                throw new ConfigurationException("Try to add a OSGI product id, but there is already one defined in parameters " + osgiCommandLineArgs);
+            }
+
+            osgiCommandLineArgs += " -product " + productId;
+        }
+
+        public void setOsgiRuntimeArguments(String args) {
+            osgiCommandLineArgs = args;
+        }
+
+        public List<String> getOsgiRuntimeArgumentsAsList() {
+            return Arrays.asList(osgiCommandLineArgs.split(" "));
+        }
+
+        public void setStartLevels(Map<String, Integer> startLevels) {
+            this.startLevels = startLevels;
+        }
+
+        public Map<String, String> getVmProperties() {
+            return vmProperties;
+        }
+
+        public void setVmProperties(Map<String, String> vmProperties) {
+            this.vmProperties = vmProperties;
+        }
+
+        public Map<String, Integer> getStartLevels() {
+            return startLevels;
+        }
+
+
+        public List<String> getCommandLineArgs() {
+            return commandLineArgs;
+        }
+
+        public void setCommandLineArgs(List<String> commandLineArgs) {
+            this.commandLineArgs = commandLineArgs;
+        }
+    }
+
+    /**
+     * Thrown if some problems reading the configuration from yaml file has occured.
+     */
+    private static class ConfigurationException extends RuntimeException {
+        public ConfigurationException(String message) {
+            super(message);
+        }
+
+        public ConfigurationException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
 }
