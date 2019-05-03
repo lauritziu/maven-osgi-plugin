@@ -1,11 +1,11 @@
 #
 # starts a osgi console which can be connected to via telnet on port 8999
+# all that are useful options during development, but not for a product
 osgiRuntimeArguments:
   -console 8999
   -consoleLog
-  -product <your_eclipse_product_id>
-  -clearPersistedState  # for development
-  -clean                # for development
+  -clearPersistedState
+  -clean
 
 startLevels:
   org.eclipse.core.runtime: 0

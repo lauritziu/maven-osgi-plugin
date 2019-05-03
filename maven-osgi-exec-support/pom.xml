@@ -91,6 +91,12 @@
 
 		<resources>
 			<resource>
+				<directory>src/main/resources</directory>
+				<includes>
+					<include>**/*.yml</include>
+				</includes>
+			</resource>
+			<resource>
 				<directory>src/test/resources</directory>
 				<includes>
 					<include>**/*.yml</include>

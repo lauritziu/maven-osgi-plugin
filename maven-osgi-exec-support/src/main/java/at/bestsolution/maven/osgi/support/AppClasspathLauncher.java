@@ -30,11 +30,11 @@ import java.util.stream.Collectors;
 
 /**
  * Should be used as main class for starting the Eclipse application from an IDE while developing.
- * <p/>
+ * </p>
  * It generates bundle.info and config.ini file, launches the Equinox OSGI framework. The bundles are
  * found by inspecting the app classpath. Each artifact (jar or path) identified as bundle will be considered.
  * It works in the same way as the {@code maven-osgi-exec} plugin's, but not Maven runtime needs to be started first.
- * <p/>
+ * </p>
  * Parameter configuration:
  *
  * TODO
@@ -45,8 +45,10 @@ public class AppClasspathLauncher {
     public static final String SYSPROP_CONFIG_FILE_PATH = "launcher.config.path";
 
     private static final String LAUNCHER_ARGS_PREFIX = "-launcher.";
+    public static final String LAUNCHER_PRODUCT_ID_PARAM = LAUNCHER_ARGS_PREFIX + "product.id";
 
-    private static final String LAUNCHER_PRODUCT_ID_PARAM = LAUNCHER_ARGS_PREFIX + "product.id";
+    private static final String DEFAULT_CONFIG_FILE = "/default-config.yml";
+
 
     private static final String TMP_CONFIG_DIR_NAME = "eclipse.app.launcher";
     private static final String EQUINOX_LAUNCHER_MAIN_CLASS = "org.eclipse.equinox.launcher.Main";
@@ -76,7 +78,7 @@ public class AppClasspathLauncher {
      * - program arguments
      * - vm properties
      *
-     * @param args
+     * @param args command line arguments
      */
     public static void main(String[] args) {
 
@@ -244,7 +246,11 @@ public class AppClasspathLauncher {
     }
 
     private FileReader useDefaultConfig() {
-        return null;
+        try {
+            return new FileReader(this.getClass().getResource(DEFAULT_CONFIG_FILE).getFile());
+        } catch (FileNotFoundException e) {
+            throw new ConfigurationException("App is not correct packaged, no default config file found: " + DEFAULT_CONFIG_FILE);
+        }
     }
 
     private void appendCommandLineArgumentsTo(List<String> cmds)  {
@@ -390,7 +396,7 @@ public class AppClasspathLauncher {
     /**
      * Thrown if some problems reading the configuration from yaml file has occured.
      */
-    private static class ConfigurationException extends RuntimeException {
+    public static class ConfigurationException extends RuntimeException {
         public ConfigurationException(String message) {
             super(message);
         }

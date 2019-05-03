@@ -44,7 +44,7 @@
 
 		<dependency>
 			<groupId>at.bestsolution</groupId>
-			<artifactId>maven-osgi-exec-ide</artifactId>
+			<artifactId>maven-osgi-exec-support</artifactId>
 			<version>${project.version}</version>
 			<scope>compile</scope>
 		</dependency>
