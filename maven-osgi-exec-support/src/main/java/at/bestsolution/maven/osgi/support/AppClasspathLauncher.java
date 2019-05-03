@@ -37,7 +37,11 @@ import java.util.stream.Collectors;
  * </p>
  * Parameter configuration:
  *
- * TODO
+ * Commandline parameters:
+ * <ul>
+ *     <li>-launcher.product.id xyz</li>
+ * </ul>
+ *
  */
 public class AppClasspathLauncher {
 
