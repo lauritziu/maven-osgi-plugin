@@ -22,6 +22,7 @@ import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -111,9 +112,20 @@ public class AppClasspathLauncher {
 
         Path configPath = Paths.get(System.getProperty("java.io.tmpdir")).resolve(TMP_CONFIG_DIR_NAME).resolve("configuration");
 
+        createConfigPathIfNecessary(configPath);
+
         configIniGenerator = new ConfigIniGenerator(configPath);
         bundleInfoGenerator = new BundleInfoGenerator(configPath);
 
+    }
+
+    private void createConfigPathIfNecessary(Path configPath) throws ConfigurationException {
+        try {
+            Files.createDirectories(configPath);
+
+        } catch (IOException e) {
+            throw new ConfigurationException("Path " + configPath + " could not be created.", e);
+        }
     }
 
 
