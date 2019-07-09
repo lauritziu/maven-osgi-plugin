@@ -47,6 +47,9 @@ class BundleInfoGenerator {
     }
 
     public Path generateBundlesInfo(Set<Bundle> bundles) {
+        Path bundleInfoDir = configTargetPath.resolve(Constants.SIMPLECONFIGURATOR_BUNDLE_NAME);
+        createConfigPathIfNecessary(bundleInfoDir);
+
         Path bundleInfo = configTargetPath.resolve(Constants.SIMPLECONFIGURATOR_BUNDLE_NAME).resolve("bundles.info");
 
         try (BufferedWriter writer = Files.newBufferedWriter(bundleInfo, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -74,6 +77,14 @@ class BundleInfoGenerator {
         return bundleInfo;
     }
 
+    private void createConfigPathIfNecessary(Path configPath) throws ConfigurationException {
+        try {
+            Files.createDirectories(configPath);
+
+        } catch (IOException e) {
+            throw new ConfigurationException("Path " + configPath + " could not be created.", e);
+        }
+    }
     @SuppressWarnings("Duplicates")
     private Path generateLocalPath(Bundle b, Path explodeDir) {
         if (b.dirShape && Files.isRegularFile(b.path)) {

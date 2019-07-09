@@ -99,7 +99,7 @@ public class AppClasspathLauncherTest {
         Path path = Paths.get(getConfigUrl(defaultConfigFileName));
         System.setProperty(AppClasspathLauncher.SYSPROP_CONFIG_FILE_PATH, path.toString());
 
-        Assertions.assertThrows(AppClasspathLauncher.ConfigurationException.class, () -> {
+        Assertions.assertThrows(ConfigurationException.class, () -> {
             new AppClasspathLauncher(Arrays.asList("-launcher.product.id", "xyz"));
         });
 

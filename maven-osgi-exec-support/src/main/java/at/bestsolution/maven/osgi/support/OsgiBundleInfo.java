@@ -25,7 +25,7 @@ import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
 /**
- * Provides utility methods to verifies {@link Artifact}'s whether they are OSGI bundles or not.
+ * Provides utility methods to verifies {@code Artifact}'s whether they are OSGI bundles or not.
  */
 public final class OsgiBundleInfo {
 

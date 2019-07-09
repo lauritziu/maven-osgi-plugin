@@ -10,6 +10,16 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.exec;
 
+import at.bestsolution.maven.osgi.support.AppClasspathLauncher;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.shared.utils.cli.CommandLineException;
+import org.apache.maven.shared.utils.cli.CommandLineUtils;
+
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
@@ -18,29 +28,42 @@ import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.maven.shared.utils.cli.CommandLineException;
-import org.apache.maven.shared.utils.cli.CommandLineUtils;
-import org.codehaus.plexus.logging.Logger;
 
 @Mojo(name="exec-osgi-java", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 
 	private static final String EQUINOX_LAUNCHER_MAIN_CLASS = "org.eclipse.equinox.launcher.Main";
 
+	@SuppressWarnings("unused")
 	@Parameter(property = "exec.args")
 	private String commandlineArgs;
 
-	public void execute() throws MojoExecutionException, MojoFailureException {
+    public void execute() throws MojoExecutionException, MojoFailureException {
+        if (!configPath.isEmpty()) {
+			File configFile = new File(configPath);
+			if (!configFile.exists()) {
+				throw new MojoExecutionException("Given path to config file does not exists: " + configPath);
+
+			} else {
+				System.setProperty(AppClasspathLauncher.SYSPROP_CONFIG_FILE_PATH, configFile.getAbsolutePath());
+			}
+        }
+
+        AppClasspathLauncher launcher = new AppClasspathLauncher(splitCommandLineArgs(commandlineArgs));
+        launcher.execute();
+    }
+
+    private List<String> splitCommandLineArgs(String commandlineArgs) {
+        if (commandlineArgs == null || commandlineArgs.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return Arrays.asList(commandlineArgs.split(" "));
+    }
+
+    public void executeOld() throws MojoExecutionException, MojoFailureException {
 		Path ini = generateConfigIni(project);
 		
 		Optional<URL> launcherJar = project.getArtifacts().stream()

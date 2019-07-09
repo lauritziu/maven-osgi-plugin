@@ -15,10 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.Reader;
+import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.*;
@@ -31,11 +28,11 @@ import java.util.stream.Collectors;
 
 /**
  * Should be used as main class for starting the Eclipse application from an IDE while developing.
- * </p>
+ * <p>
  * It generates bundle.info and config.ini file, launches the Equinox OSGI framework. The bundles are
  * found by inspecting the app classpath. Each artifact (jar or path) identified as bundle will be considered.
  * It works in the same way as the {@code maven-osgi-exec} plugin's, but not Maven runtime needs to be started first.
- * </p>
+ * <p>
  * Parameter configuration:
  *
  * Commandline parameters:
@@ -70,9 +67,6 @@ public class AppClasspathLauncher {
 
     // external parameters: needs to be supprted
 
-    protected Map<String, Integer> startLevels = new HashMap<>();
-    protected List<String> osgiRuntimeArguments;
-    protected Properties vmProperties;
     private List<String> commandLineArgs;
     private Optional<Path> ymlConfigPath;
 
@@ -156,11 +150,11 @@ public class AppClasspathLauncher {
         List<String> cmd = new ArrayList<>();
         cmd.add("-configuration");
         cmd.add("file:" + ini.toString());
-        cmd.addAll(osgiRuntimeArguments);
+        cmd.addAll(getConfiguration().getOsgiRuntimeArgumentsAsList());
 
         appendCommandLineArgumentsTo(cmd);
 
-        System.getProperties().putAll(vmProperties);
+        System.getProperties().putAll(getConfiguration().getVmProperties());
 
         Thread t = new Thread() {
             public void run() {
@@ -229,7 +223,7 @@ public class AppClasspathLauncher {
     private Configuration readConfiguration() {
         Yaml yaml = new Yaml(new Constructor(Configuration.class));
 
-        FileReader defaultConfigReader = useDefaultConfig();
+        Reader defaultConfigReader = useDefaultConfig();
 
         Object config = null;
 
@@ -246,7 +240,7 @@ public class AppClasspathLauncher {
         return configuration;
     }
 
-    private FileReader useCustomConfigReader(Path path) {
+    private Reader useCustomConfigReader(Path path) {
 
         FileReader reader = null;
 
@@ -261,10 +255,11 @@ public class AppClasspathLauncher {
         return reader;
     }
 
-    private FileReader useDefaultConfig() {
+    private InputStreamReader useDefaultConfig() {
         try {
-            return new FileReader(this.getClass().getResource(DEFAULT_CONFIG_FILE).getFile());
-        } catch (FileNotFoundException e) {
+            return new InputStreamReader(this.getClass().getResourceAsStream(DEFAULT_CONFIG_FILE));
+
+        } catch (Exception e) {
             throw new ConfigurationException("App is not correct packaged, no default config file found: " + DEFAULT_CONFIG_FILE);
         }
     }
@@ -314,8 +309,8 @@ public class AppClasspathLauncher {
     @SuppressWarnings("Duplicates")
     private Integer getStartLevel(Manifest m) {
         String name = OsgiBundleInfo.bundleName(m);
-        if (startLevels != null) {
-            return startLevels.get(name);
+        if (getConfiguration().getStartLevels() != null) {
+            return getConfiguration().getStartLevels().get(name);
         } else {
             // default startlevels
             switch (name) {
@@ -364,6 +359,7 @@ public class AppClasspathLauncher {
         /**
          * Adds a osgiCommand line argument {@code -product} with the given product id that is to be started.
          *
+         * @param productId Eclipse product Id to start
          * @throws ConfigurationException is thrown if argument {@link #OSGI_PRODUCT_PARAM} is already defined in osgi
          * command line args.
          */
@@ -406,19 +402,6 @@ public class AppClasspathLauncher {
 
         public void setCommandLineArgs(List<String> commandLineArgs) {
             this.commandLineArgs = commandLineArgs;
-        }
-    }
-
-    /**
-     * Thrown if some problems reading the configuration from yaml file has occured.
-     */
-    public static class ConfigurationException extends RuntimeException {
-        public ConfigurationException(String message) {
-            super(message);
-        }
-
-        public ConfigurationException(String message, Throwable cause) {
-            super(message, cause);
         }
     }
 

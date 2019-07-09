@@ -45,16 +45,10 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 	
 	@Parameter(defaultValue = "${project}", required = true, readonly = true)
 	protected MavenProject project;
-	
-	@Parameter(defaultValue = "${project.build.directory}")
-    private String projectBuildDir;
 
-	@Parameter(defaultValue = "${project.build.finalName}")
-    private String filename;
+	@Parameter(readonly = true)
+	protected String configPath;
 	
-	@Parameter
-	private boolean debug;
-
 	@Component
 	protected Logger logger;
 
