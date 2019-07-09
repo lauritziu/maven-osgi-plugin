@@ -67,7 +67,6 @@ public class AppClasspathLauncher {
 
     // external parameters: needs to be supprted
 
-    private List<String> commandLineArgs;
     private Optional<Path> ymlConfigPath;
 
 
@@ -265,8 +264,8 @@ public class AppClasspathLauncher {
     }
 
     private void appendCommandLineArgumentsTo(List<String> cmds)  {
-        if (commandLineArgs != null) {
-            cmds.addAll(commandLineArgs);
+        if (getConfiguration().getCommandLineArgs() != null) {
+            cmds.addAll(getConfiguration().getCommandLineArgs());
         }
     }
 
