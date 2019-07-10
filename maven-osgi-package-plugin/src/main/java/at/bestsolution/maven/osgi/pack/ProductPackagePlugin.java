@@ -10,26 +10,24 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.pack;
 
-import java.io.File;
-import java.io.PrintWriter;
-import java.util.Map.Entry;
-import java.util.jar.JarFile;
-
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.plugins.annotations.*;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 import org.codehaus.plexus.util.xml.XMLWriter;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.codehaus.plexus.util.xml.Xpp3DomWriter;
+
+import java.io.File;
+import java.io.PrintWriter;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 @Mojo(name = "package-product", defaultPhase = LifecyclePhase.PREPARE_PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE)
 public class ProductPackagePlugin extends AbstractMojo {
@@ -42,6 +40,9 @@ public class ProductPackagePlugin extends AbstractMojo {
 
     @Parameter(required = true)
     private Product product;
+    
+	@Parameter
+	private List<String> noneRootIUs;
 
     @Component
     private Logger logger;
@@ -63,25 +64,86 @@ public class ProductPackagePlugin extends AbstractMojo {
 
         Xpp3Dom launcherArgs = new Xpp3Dom("launcherArgs");
         Xpp3Dom programArgs = new Xpp3Dom("programArgs");
-        for (String a : product.launcherArgs.programArguments) {
-            programArgs.setValue(a);
-        }
+        programArgs.setValue(product.launcherArgs.programArguments.stream().collect(Collectors.joining(" ")));
         launcherArgs.addChild(programArgs);
 
         Xpp3Dom vmArgs = new Xpp3Dom("vmArgs");
-        for (Entry<Object, Object> e : product.launcherArgs.vmProperties.entrySet()) {
-            vmArgs.setValue("-D" + e.getKey() + "=" + e.getValue());
-        }
-
+        vmArgs.setValue(
+        	product.launcherArgs.vmProperties.entrySet().stream()
+        		.map( e -> "-D" + e.getKey() + "=" + e.getValue())
+        		.collect(Collectors.joining(" ")));
         launcherArgs.addChild(vmArgs);
 
         xppProduct.addChild(launcherArgs);
+        
+        if( product.launcher != null ) {
+        	Xpp3Dom launcher = new Xpp3Dom("launcher");
+        	if( product.launcher.name != null ) {
+        		launcher.setAttribute("name", product.launcher.name);
+        	}
+        	if( product.launcher.linux != null && product.launcher.linux.icon != null ) {
+        		Xpp3Dom linux = new Xpp3Dom("linux");
+        		linux.setAttribute("icon", product.launcher.linux.icon);
+        		launcher.addChild(linux);
+        	}
+        	if( product.launcher.macosx != null && product.launcher.macosx.icon != null ) {
+        		Xpp3Dom macosx = new Xpp3Dom("macosx");
+        		macosx.setAttribute("icon", product.launcher.macosx.icon);
+        		launcher.addChild(macosx);
+        	}
+        	if( product.launcher.win != null ) {
+        		Xpp3Dom win = new Xpp3Dom("win");
+        		win.setAttribute("useIco", product.launcher.win.useIco+"");
+        		if( product.launcher.win.ico != null && product.launcher.win.ico.path != null ) {
+        			Xpp3Dom ico = new Xpp3Dom("ico");
+        			ico.setAttribute("path", product.launcher.win.ico.path);
+        			win.addChild(ico);
+        		}
+        		if( product.launcher.win.bmp == null ) {
+        			win.addChild(new Xpp3Dom("bmp"));
+        		} else {
+        			Xpp3Dom bmp = new Xpp3Dom("bmp");
+        			if( product.launcher.win.bmp.winSmallHigh != null ) {
+        				bmp.setAttribute("winSmallHigh", product.launcher.win.bmp.winSmallHigh);	
+        			}
+        			if( product.launcher.win.bmp.winSmallLow != null ) {
+        				bmp.setAttribute("winSmallLow", product.launcher.win.bmp.winSmallLow);	
+        			}
+        			if( product.launcher.win.bmp.winMediumHigh != null ) {
+        				bmp.setAttribute("winMediumHigh", product.launcher.win.bmp.winMediumHigh);	
+        			}
+        			if( product.launcher.win.bmp.winMediumLow != null ) {
+        				bmp.setAttribute("winMediumLow", product.launcher.win.bmp.winMediumLow);	
+        			}
+        			if( product.launcher.win.bmp.winLargeHigh != null ) {
+        				bmp.setAttribute("winLargeHigh", product.launcher.win.bmp.winLargeHigh);	
+        			}
+        			if( product.launcher.win.bmp.winLargeLow != null ) {
+        				bmp.setAttribute("winLargeLow", product.launcher.win.bmp.winLargeLow);	
+        			}
+        			if( product.launcher.win.bmp.winExtraLargeHigh != null ) {
+        				bmp.setAttribute("winExtraLargeHigh", product.launcher.win.bmp.winExtraLargeHigh);	
+        			}
+        			
+        			win.addChild(bmp);
+        		}
+        		
+        		launcher.addChild(win);
+        	}
+        	
+        	xppProduct.addChild(launcher);
+        }
+        
+        
         xppProduct.addChild(new Xpp3Dom("windowImages"));
 
         Xpp3Dom features = new Xpp3Dom("features");
         project.getArtifacts().stream().filter(this::pomFilter).filter(this::featureFilter).map(a -> {
             Xpp3Dom feature = new Xpp3Dom("feature");
             feature.setAttribute("id", a.getArtifactId());
+            if( noneRootIUs == null || ! noneRootIUs.contains(a.getGroupId() + ":" + a.getArtifactId()) ) {
+            	feature.setAttribute("installMode", "root");	
+            }
             return feature;
         }).forEach(features::addChild);
         xppProduct.addChild(features);

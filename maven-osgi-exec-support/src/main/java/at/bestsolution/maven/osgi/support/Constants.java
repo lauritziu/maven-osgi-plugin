@@ -10,12 +10,12 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.support;
 
-abstract class Constants {
+abstract public class Constants {
 
     public static final String LF = System.getProperty("line.separator");
     public static final String OSGI_FRAMEWORK_BUNDLE_NAME = "org.eclipse.osgi";
     public static final String SIMPLECONFIGURATOR_BUNDLE_NAME = "org.eclipse.equinox.simpleconfigurator";
-
+    public static final String OSGI_FRAMEWORK_EXTENSIONS = "osgi.framework.extensions";
 
     private Constants() {
     }

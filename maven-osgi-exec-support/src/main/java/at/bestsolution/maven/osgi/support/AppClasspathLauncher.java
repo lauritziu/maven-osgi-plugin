@@ -26,6 +26,8 @@ import java.util.*;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
+import static at.bestsolution.maven.osgi.support.Constants.OSGI_FRAMEWORK_EXTENSIONS;
+
 /**
  * Should be used as main class for starting the Eclipse application from an IDE while developing.
  * <p>
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
  */
 public class AppClasspathLauncher {
 
+
     /** system property to specify the path to a config yaml file */
     public static final String SYSPROP_CONFIG_FILE_PATH = "launcher.config.path";
 
@@ -50,7 +53,6 @@ public class AppClasspathLauncher {
     public static final String LAUNCHER_PRODUCT_ID_PARAM = LAUNCHER_ARGS_PREFIX + "product.id";
 
     private static final String DEFAULT_CONFIG_FILE = "/default-config.yml";
-
 
     private static final String TMP_CONFIG_DIR_NAME = "eclipse.app.launcher";
     private static final String EQUINOX_LAUNCHER_MAIN_CLASS = "org.eclipse.equinox.launcher.Main";
@@ -107,8 +109,8 @@ public class AppClasspathLauncher {
 
         createConfigPathIfNecessary(configPath);
 
-        configIniGenerator = new ConfigIniGenerator(configPath);
-        bundleInfoGenerator = new BundleInfoGenerator(configPath);
+        configIniGenerator = new ConfigIniGenerator(configPath, configuration);
+        bundleInfoGenerator = new BundleInfoGenerator(configPath, configuration);
 
     }
 
@@ -129,9 +131,9 @@ public class AppClasspathLauncher {
 
     @SuppressWarnings("Duplicates")
     public void execute() {
-
-        Path bundleInfoPath = bundleInfoGenerator.generateBundlesInfo(bundles);
-        Path ini = configIniGenerator.generateConfigIni(bundles, bundleInfoPath);
+        Set<Path> extensionPaths = new HashSet<>();
+        Path bundleInfoPath = bundleInfoGenerator.generateBundlesInfo(bundles, extensionPaths);
+        Path ini = configIniGenerator.generateConfigIni(bundles, bundleInfoPath, extensionPaths);
 
         Optional<URL> launcherJar = bundles.stream()
                 .filter(bundle -> bundle.symbolicName.contains("org.eclipse.equinox.launcher"))
@@ -152,6 +154,13 @@ public class AppClasspathLauncher {
         cmd.addAll(getConfiguration().getOsgiRuntimeArgumentsAsList());
 
         appendCommandLineArgumentsTo(cmd);
+
+        if( getConfiguration().getVmProperties().containsKey(OSGI_FRAMEWORK_EXTENSIONS) ) {
+            String extensionClasspath = extensionPaths.stream().map(Path::toString).collect(Collectors.joining(",","file:",""));
+            if( ! extensionClasspath.trim().isEmpty() ) {
+                getConfiguration().getVmProperties().put("osgi.frameworkClassPath",".," + extensionClasspath);
+            }
+        }
 
         System.getProperties().putAll(getConfiguration().getVmProperties());
 

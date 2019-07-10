@@ -26,10 +26,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static at.bestsolution.maven.osgi.support.Constants.OSGI_FRAMEWORK_EXTENSIONS;
 
 @Mojo(name="exec-osgi-java", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
@@ -64,7 +64,8 @@ public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
     }
 
     public void executeOld() throws MojoExecutionException, MojoFailureException {
-		Path ini = generateConfigIni(project);
+		Set<Path> extensionPaths = new HashSet<>();
+		Path ini = generateConfigIni(project, extensionPaths);
 		
 		Optional<URL> launcherJar = project.getArtifacts().stream()
 				.filter(a -> "org.eclipse.equinox.launcher".equals(a.getArtifactId())).findFirst()
@@ -84,6 +85,13 @@ public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 		cmd.addAll(programArguments);
 
 		appendCommandLineArgumentsTo(cmd);
+
+		if( vmProperties.containsKey(OSGI_FRAMEWORK_EXTENSIONS) ) {
+			String extensionClasspath = extensionPaths.stream().map(Path::toString).collect(Collectors.joining(",","file:",""));
+			if( ! extensionClasspath.trim().isEmpty() ) {
+				vmProperties.put("osgi.frameworkClassPath",".," + extensionClasspath);
+			}
+		}
 
 		System.getProperties().putAll(vmProperties);
 		

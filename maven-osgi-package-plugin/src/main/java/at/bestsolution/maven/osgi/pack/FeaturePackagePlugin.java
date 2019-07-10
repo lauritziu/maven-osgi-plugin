@@ -10,37 +10,29 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.pack;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.Predicate;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
-
+import aQute.bnd.version.MavenVersion;
+import aQute.bnd.version.Version;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.plugins.annotations.*;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 import org.codehaus.plexus.util.xml.XMLWriter;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.codehaus.plexus.util.xml.Xpp3DomWriter;
+import org.osgi.framework.Filter;
+import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.InvalidSyntaxException;
 
-import aQute.bnd.version.MavenVersion;
-import aQute.bnd.version.Version;
+import java.io.*;
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 import static at.bestsolution.maven.osgi.pack.OsgiBundleVerifier.formatArtifact;
 import static at.bestsolution.maven.osgi.pack.OsgiBundleVerifier.formatDependency;
@@ -63,6 +55,8 @@ public class FeaturePackagePlugin extends AbstractMojo {
 	private static final String CLASSIFIER_MAC = "mac";
 	private static final String CLASSIFIER_WIN32 = "win32";
 	private static final String CLASSIFIER_X64 = "x64";
+	private static final String CLASSIFIER_WIN_64 = "win32_64";
+	private static final String CLASSIFIER_LINUX_64 = "linux_64";
 
 
 	@Parameter(defaultValue = "${project}", required = true, readonly = true)
@@ -122,26 +116,32 @@ public class FeaturePackagePlugin extends AbstractMojo {
         List<Artifact> nonOsgiArtifacts = new ArrayList<>();
 
 		for( Dependency a : project.getDependencies() ) {
-			Xpp3Dom p = new Xpp3Dom("plugin");
+			
 			Optional<Artifact> first = project.getArtifacts().stream().filter(filter(a)).findFirst();
 			if( ! first.isPresent() ) {
 				throw new IllegalStateException("Could not find artifact for '" + formatDependency(a) + "'");
 			}
 
-            if (!getOsgiVerifier().isBundle(first.get())) {
+			OsgiBundleVerifier osgiVerifier = getOsgiVerifier();
+			if( osgiVerifier.isFeature(first.get()) ) {
+				Xpp3Dom p = new Xpp3Dom("includes");
+				p.setAttribute("id", a.getArtifactId());
+				p.setAttribute("version", a.getVersion());
+				d.addChild(p);
+			} else if( osgiVerifier.isBundle(first.get()) ) {
+				Xpp3Dom p = new Xpp3Dom("plugin");
+				Manifest mm = getManifest(first.get());
+				p.setAttribute("id", bundleName(mm));
+//				p.setAttribute("download-size", "1"); // FIXME
+//				p.setAttribute("install-size", "1"); // FIXME
+				p.setAttribute("version", bundleVersion(mm));
+				p.setAttribute("unpack", dirShape(mm) + "");
+				generatePlatformAttributes(p, mm, first.get());
+				
+				d.addChild(p);
+			} else {
                 nonOsgiArtifacts.add(first.get());
-                continue;
             }
-
-			Manifest mm = getManifest(first.get());
-			p.setAttribute("id", bundleName(mm));
-//			p.setAttribute("download-size", "1"); // FIXME
-//			p.setAttribute("install-size", "1"); // FIXME
-			p.setAttribute("version", bundleVersion(mm));
-			p.setAttribute("unpack", dirShape(mm) + "");
-			generatePlatformAttributes(p, first.get());
-			
-			d.addChild(p);
 		}
 
         if (!nonOsgiArtifacts.isEmpty()) {
@@ -172,7 +172,7 @@ public class FeaturePackagePlugin extends AbstractMojo {
 		}
 	}
 
-	private void generatePlatformAttributes(Xpp3Dom childNode, Artifact artifact) {
+	private void generatePlatformAttributes(Xpp3Dom childNode, Manifest mm, Artifact artifact) {
 		if (CLASSIFIER_MAC.equalsIgnoreCase(artifact.getClassifier())) {
 			childNode.setAttribute("os", "macosx");
 			childNode.setAttribute("ws", "cocoa");
@@ -183,13 +183,48 @@ public class FeaturePackagePlugin extends AbstractMojo {
 			childNode.setAttribute("ws", "win32");
 			childNode.setAttribute("arch", "x86");
 
-		} else if (CLASSIFIER_X64.equalsIgnoreCase(artifact.getClassifier())) {
+		} else if (CLASSIFIER_X64.equalsIgnoreCase(artifact.getClassifier()) || CLASSIFIER_WIN_64.equalsIgnoreCase(artifact.getClassifier())) {
 			childNode.setAttribute("os", "win32");
 			childNode.setAttribute("ws", "win32");
 			childNode.setAttribute("arch", "x86_64");
+			
+		} else if( CLASSIFIER_LINUX_64.equalsIgnoreCase(artifact.getClassifier()) ) {
+			childNode.setAttribute("os", "linux");
+			childNode.setAttribute("ws", "gtk");
+			childNode.setAttribute("arch", "x86_64");
+			
+		} else if( mm.getMainAttributes().getValue("Eclipse-PlatformFilter") != null ) {
+			try {
+				Filter filter = FrameworkUtil.createFilter(mm.getMainAttributes().getValue("Eclipse-PlatformFilter"));
+				String[][] filterTypes = {
+						{ "win32", "win32", "x86_64" },
+						{ "win32", "win32", "x86" },
+						{ "macosx", "cocoa", "x86_64" },
+						{ "linux", "gtk", "x86" },
+						{ "linux", "gtk", "x86_64" }
+				};
+				for( String[] filterType : filterTypes ) {
+					if( filter.matches(createMap(filterType[0], filterType[1], filterType[2])) ) {
+						childNode.setAttribute("os", filterType[0]);
+						childNode.setAttribute("ws", filterType[1]);
+						childNode.setAttribute("arch", filterType[2]);
+						break;
+					}
+				}
+			} catch (InvalidSyntaxException e) {
+				
+			}
 		}
 	}
 
+	private Map<String, String> createMap(String os, String ws, String arch) {
+		Map<String, String> m = new HashMap<>();
+		m.put("osgi.os", os);
+		m.put("osgi.ws", ws);
+		m.put("osgi.arch", arch);
+		return m;
+	}
+	
 	private void printNonOsgiBundles(List<Artifact> nonOsgiArtifacts) {
         if (nonOsgiArtifacts.isEmpty()) {
             return;

@@ -17,10 +17,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.zip.ZipFile;
+
+import static at.bestsolution.maven.osgi.support.Constants.OSGI_FRAMEWORK_EXTENSIONS;
 
 /**
  * Generates the bundle.info file referencing all bundles to be used.
@@ -30,6 +35,7 @@ import java.util.zip.ZipFile;
 class BundleInfoGenerator {
 
     private Path configTargetPath;
+    private AppClasspathLauncher.Configuration configuration;
 
     /**
      *
@@ -37,8 +43,10 @@ class BundleInfoGenerator {
      *                         this class
      * @throws IllegalArgumentException for a path not pointing to a directory or to a resource does not exit.
      */
-    public BundleInfoGenerator(Path configTargetPath) {
+    public BundleInfoGenerator(Path configTargetPath, AppClasspathLauncher.Configuration configuration) {
         Objects.nonNull(configTargetPath);
+        Objects.nonNull(configuration);
+        this.configuration = configuration;
         if (!configTargetPath.toFile().exists() || !configTargetPath.toFile().isDirectory()) {
             throw new IllegalArgumentException("Path " + configTargetPath + " does not exists or is no directory");
         }
@@ -46,7 +54,7 @@ class BundleInfoGenerator {
         this.configTargetPath = configTargetPath;
     }
 
-    public Path generateBundlesInfo(Set<Bundle> bundles) {
+    public Path generateBundlesInfo(Set<Bundle> bundles, Set<Path> extensionPaths) {
         Path bundleInfoDir = configTargetPath.resolve(Constants.SIMPLECONFIGURATOR_BUNDLE_NAME);
         createConfigPathIfNecessary(bundleInfoDir);
 
@@ -65,7 +73,7 @@ class BundleInfoGenerator {
 
                 writer.append(b.symbolicName);
                 writer.append("," + b.version);
-                writer.append(",file:" + generateLocalPath(b, configTargetPath.resolve(".explode")).toString());
+                writer.append(",file:" + generateLocalPath(b, configTargetPath.resolve(".explode"), extensionPaths).toString());
                 writer.append("," + b.startLevel); // Start Level
                 writer.append("," + b.autoStart); // Auto-Start
                 writer.append(Constants.LF);
@@ -86,7 +94,7 @@ class BundleInfoGenerator {
         }
     }
     @SuppressWarnings("Duplicates")
-    private Path generateLocalPath(Bundle b, Path explodeDir) {
+    private Path generateLocalPath(Bundle b, Path explodeDir, Set<Path> extensionPaths) {
         if (b.dirShape && Files.isRegularFile(b.path)) {
             Path p = explodeDir.resolve(b.symbolicName + "_" + b.version);
             if (!Files.exists(p)) {
@@ -124,6 +132,29 @@ class BundleInfoGenerator {
                 }
             }
             return p;
+
+        } else if (configuration.getVmProperties().containsKey(OSGI_FRAMEWORK_EXTENSIONS)) {
+            List<String> extensions = Arrays.asList(((String) configuration.getVmProperties().get(OSGI_FRAMEWORK_EXTENSIONS)).split(","));
+
+            if ("org.eclipse.osgi".equals(b.symbolicName)
+                    || extensions.stream().anyMatch(v -> v.trim().equals(b.symbolicName))) {
+                try {
+                    if (!Files.exists(explodeDir)) {
+                        Files.createDirectories(explodeDir);
+                    }
+
+                    Path targetFile = explodeDir.resolve(b.path.getFileName());
+                    Files.copy(b.path, targetFile, StandardCopyOption.REPLACE_EXISTING);
+
+                    if (!"org.eclipse.osgi".equals(b.symbolicName)) {
+                        extensionPaths.add(targetFile);
+                    }
+
+                    return targetFile;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
         return b.path.toAbsolutePath();
     }

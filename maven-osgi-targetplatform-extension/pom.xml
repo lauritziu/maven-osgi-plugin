@@ -4,7 +4,13 @@
 
 	<groupId>at.bestsolution</groupId>
 	<artifactId>maven-osgi-targetplatform-extension</artifactId>
-	<version>0.0.3-SNAPSHOT</version>
+
+	<parent>
+		<groupId>at.bestsolution</groupId>
+		<artifactId>maven-osgi-modules</artifactId>
+		 <version>0.0.3-SNAPSHOT</version>
+	</parent>
+
 	<packaging>jar</packaging>
 
 	<name>Maven OSGi Target Platform Extension</name>

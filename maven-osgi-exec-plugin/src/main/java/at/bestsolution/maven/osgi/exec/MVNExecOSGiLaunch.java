@@ -10,32 +10,25 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.exec;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.stream.Collectors;
-
+import com.google.common.base.Strings;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.Executor;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.shared.utils.cli.CommandLineUtils;
-import org.codehaus.plexus.logging.Logger;
 
-import com.google.common.base.Strings;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static at.bestsolution.maven.osgi.support.Constants.OSGI_FRAMEWORK_EXTENSIONS;
 
 @Mojo(name = "exec-osgi", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class MVNExecOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
@@ -53,7 +46,8 @@ public class MVNExecOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException {
-		Path ini = generateConfigIni(project);
+		Set<Path> extensionPaths = new HashSet<>();
+		Path ini = generateConfigIni(project, extensionPaths);
 		
 		Optional<File> launcherJar = project.getArtifacts().stream()
 				.filter(a -> "org.eclipse.equinox.launcher".equals(a.getArtifactId())).findFirst()
@@ -65,6 +59,12 @@ public class MVNExecOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 
 		List<String> commandArguments = new ArrayList<>();
 		commandArguments.addAll(vmProperties.entrySet().stream().map( e -> "-D" + e.getKey()+"="+e.getValue()).collect(Collectors.toList()));
+		if( vmProperties.containsKey(OSGI_FRAMEWORK_EXTENSIONS) ) {
+			String extensionClasspath = extensionPaths.stream().map(Path::toString).collect(Collectors.joining(",","file:",""));
+			if( ! extensionClasspath.trim().isEmpty() ) {
+				commandArguments.add("-Dosgi.frameworkClassPath=.," + extensionClasspath);
+			}
+		}
 		if (!Strings.isNullOrEmpty(argsProp)) {
 			handleSystemPropertyArguments(argsProp, commandArguments);
 		}
