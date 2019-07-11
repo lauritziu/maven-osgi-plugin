@@ -10,6 +10,7 @@
  *******************************************************************************/
 package at.bestsolution.maven.osgi.exec;
 
+import at.bestsolution.maven.osgi.support.Bundle;
 import at.bestsolution.maven.osgi.support.OsgiBundleInfo;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.maven.artifact.Artifact;
@@ -76,19 +77,14 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 		return w.toString();
 	}
 	
-	protected Path generateConfigIni(MavenProject project, Set<Path> extensionPaths) {
-		Set<Bundle> bundles = project
-				.getArtifacts()
-				.stream()
-				.map( this::map )
-				.filter( Optional::isPresent)
-				.map( Optional::get)
-				.collect(Collectors.toSet());
+	protected Path generateConfigIni(Set<Path> extensionPaths) {
+		Set<Bundle> bundles = findAllBundlesFromProject();
 		
 
 		if (project.getPackaging().equals("jar")) {
 			Path binary = project.getArtifact().getFile().toPath();
-			bundles.add(new Bundle(getOsgiVerifier().getManifest(project.getArtifact().getFile().toPath()).get(),binary));
+			Manifest manifest = getOsgiVerifier().getManifest(project.getArtifact().getFile().toPath()).get();
+			bundles.add(new Bundle(manifest, binary, getStartLevel(manifest)));
 		}
 
 		Path p = Paths.get(System.getProperty("java.io.tmpdir"))
@@ -136,6 +132,16 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 		}
 
 		return p;
+	}
+
+	protected Set<Bundle> findAllBundlesFromProject() {
+		return project
+				.getArtifacts()
+				.stream()
+				.map( this::map )
+				.filter( Optional::isPresent)
+				.map( Optional::get)
+				.collect(Collectors.toSet());
 	}
 
 	private static String toInstallAreaURL(Path p) {
@@ -252,7 +258,9 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 					throw new RuntimeException(e);
 				}
 			}
+
 			return p;
+
 		} else if (vmProperties.containsKey(OSGI_FRAMEWORK_EXTENSIONS)) {
 			List<String> extensions = Arrays.asList(((String) vmProperties.get(OSGI_FRAMEWORK_EXTENSIONS)).split(","));
 
@@ -283,7 +291,7 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 		Path pathToArtifact = a.getFile().toPath();
 		return getOsgiVerifier().getManifest(a.getFile().toPath())
 				.filter(MVNBaseOSGiLaunchPlugin::isBundle)
-				.map( m -> new Bundle(m, pathToArtifact));
+				.map( m -> new Bundle(m, pathToArtifact, getStartLevel(m)));
 
 	}
 
@@ -297,51 +305,28 @@ public abstract class MVNBaseOSGiLaunchPlugin extends AbstractMojo {
 	}
 
 
-	private Integer getStartLevel(Manifest m) {
+	protected Integer getStartLevel(Manifest m) {
 		String name = bundleName(m);
 		if (startLevels != null) {
 			return startLevels.get(name);
 		} else {
 			switch (name) {
-			case "org.eclipse.core.runtime":
-				return 4;
-			case "org.eclipse.equinox.common":
-				return 2;
-			case "org.eclipse.equinox.ds":
-				return 2;
-			case "org.eclipse.equinox.event":
-				return 2;
-			case "org.eclipse.equinox.simpleconfigurator":
-				return 1;
-			case "org.eclipse.osgi":
-				return -1;
-			default:
-				return null;
+				case "org.eclipse.core.runtime":
+					return 4;
+				case "org.eclipse.equinox.common":
+					return 2;
+				case "org.eclipse.equinox.ds":
+					return 2;
+				case "org.eclipse.equinox.event":
+					return 2;
+				case "org.eclipse.equinox.simpleconfigurator":
+					return 1;
+				case "org.eclipse.osgi":
+					return -1;
+				default:
+					return null;
 			}
 		}
 	}
 
-	public class Bundle {
-		public final String symbolicName;
-		public final String version;
-		public final Integer startLevel;
-		public final Path path;
-		public final boolean dirShape;
-		public final boolean autoStart;
-
-		public Bundle(Manifest m, Path path) {
-			this(bundleName(m), m.getMainAttributes().getValue("Bundle-Version"), getStartLevel(m), path,
-					getStartLevel(m) != null, "dir".equals(m.getMainAttributes().getValue("Eclipse-BundleShape")));
-		}
-
-		public Bundle(String symbolicName, String version, Integer startLevel, Path path, boolean autoStart,
-				boolean dirShape) {
-			this.symbolicName = symbolicName;
-			this.version = version;
-			this.startLevel = startLevel == null ? 4 : startLevel;
-			this.path = path;
-			this.autoStart = autoStart;
-			this.dirShape = dirShape;
-		}
-	}
 }

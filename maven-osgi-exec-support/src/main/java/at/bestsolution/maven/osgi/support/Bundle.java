@@ -14,7 +14,7 @@ package at.bestsolution.maven.osgi.support;
 import java.nio.file.Path;
 import java.util.jar.Manifest;
 
-class Bundle {
+public class Bundle {
     public final String symbolicName;
     public final String version;
     public final Integer startLevel;

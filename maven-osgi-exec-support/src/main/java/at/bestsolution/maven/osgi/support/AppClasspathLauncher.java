@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
@@ -88,7 +89,6 @@ public class AppClasspathLauncher {
     }
 
 
-
     public AppClasspathLauncher() {
         this(new ArrayList());
     }
@@ -102,8 +102,6 @@ public class AppClasspathLauncher {
 
         Optional<String> customizedProductId = findProductIdFromCommandline(commandLineArgs);
         customizedProductId.ifPresent(configuration::addProductId);
-
-        bundles = findAllBundlesInClasspath();
 
         Path configPath = Paths.get(System.getProperty("java.io.tmpdir")).resolve(TMP_CONFIG_DIR_NAME).resolve("configuration");
 
@@ -128,9 +126,15 @@ public class AppClasspathLauncher {
         return configuration;
     }
 
+    public void execute() {
+        execute(this::findAllBundlesInClasspath);
+    }
 
     @SuppressWarnings("Duplicates")
-    public void execute() {
+    public void execute(Supplier<Set<Bundle>> bundleSupplier) {
+
+        bundles = bundleSupplier.get();
+
         Set<Path> extensionPaths = new HashSet<>();
         Path bundleInfoPath = bundleInfoGenerator.generateBundlesInfo(bundles, extensionPaths);
         Path ini = configIniGenerator.generateConfigIni(bundles, bundleInfoPath, extensionPaths);
@@ -315,7 +319,7 @@ public class AppClasspathLauncher {
 
 
     @SuppressWarnings("Duplicates")
-    private Integer getStartLevel(Manifest m) {
+    public Integer getStartLevel(Manifest m) {
         String name = OsgiBundleInfo.bundleName(m);
         if (getConfiguration().getStartLevels() != null) {
             return getConfiguration().getStartLevels().get(name);
@@ -340,8 +344,8 @@ public class AppClasspathLauncher {
         }
     }
 
-    private URL[] getClasspath() {
-        ClassLoader classLoader = this.getClass().getClassLoader();
+    private static URL[] getClasspath() {
+        ClassLoader classLoader = AppClasspathLauncher.class.getClassLoader();
 
         if (!(classLoader instanceof URLClassLoader)) {
             throw new IllegalArgumentException("Only classloader instances of type " + URLClassLoader.class + " are supported");

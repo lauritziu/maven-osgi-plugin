@@ -47,7 +47,7 @@ public class MVNExecOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException {
 		Set<Path> extensionPaths = new HashSet<>();
-		Path ini = generateConfigIni(project, extensionPaths);
+		Path ini = generateConfigIni(extensionPaths);
 		
 		Optional<File> launcherJar = project.getArtifacts().stream()
 				.filter(a -> "org.eclipse.equinox.launcher".equals(a.getArtifactId())).findFirst()

@@ -27,6 +27,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 import static at.bestsolution.maven.osgi.support.Constants.OSGI_FRAMEWORK_EXTENSIONS;
@@ -39,8 +40,9 @@ public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 	@SuppressWarnings("unused")
 	@Parameter(property = "exec.args")
 	private String commandlineArgs;
+	private AppClasspathLauncher launcher;
 
-    public void execute() throws MojoExecutionException, MojoFailureException {
+	public void execute() throws MojoExecutionException, MojoFailureException {
         if (!configPath.isEmpty()) {
 			File configFile = new File(configPath);
 			if (!configFile.exists()) {
@@ -51,8 +53,8 @@ public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 			}
         }
 
-        AppClasspathLauncher launcher = new AppClasspathLauncher(splitCommandLineArgs(commandlineArgs));
-        launcher.execute();
+        launcher = new AppClasspathLauncher(splitCommandLineArgs(commandlineArgs));
+        launcher.execute(this::findAllBundlesFromProject);
     }
 
     private List<String> splitCommandLineArgs(String commandlineArgs) {
@@ -65,7 +67,7 @@ public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 
     public void executeOld() throws MojoExecutionException, MojoFailureException {
 		Set<Path> extensionPaths = new HashSet<>();
-		Path ini = generateConfigIni(project, extensionPaths);
+		Path ini = generateConfigIni(extensionPaths);
 		
 		Optional<URL> launcherJar = project.getArtifacts().stream()
 				.filter(a -> "org.eclipse.equinox.launcher".equals(a.getArtifactId())).findFirst()
@@ -124,5 +126,10 @@ public class MVNJavaOSGiLaunch extends MVNBaseOSGiLaunchPlugin {
 				throw new MojoExecutionException(e.getMessage());
 			}
 		}
+	}
+
+	@Override
+	protected Integer getStartLevel(Manifest m) {
+		return launcher.getStartLevel(m);
 	}
 }
