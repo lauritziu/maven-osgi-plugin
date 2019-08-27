@@ -94,27 +94,21 @@ class BundleInfoGenerator {
         }
     }
     @SuppressWarnings("Duplicates")
-    private Path generateLocalPath(Bundle b, Path explodeDir, Set<Path> extensionPaths) {
-        if (b.dirShape && Files.isRegularFile(b.path)) {
-            Path p = explodeDir.resolve(b.symbolicName + "_" + b.version);
+    private Path generateLocalPath(Bundle bundle, Path explodeDir, Set<Path> extensionPaths) {
+        if (bundle.dirShape && Files.isRegularFile(bundle.path)) {
+            Path p = explodeDir.resolve(bundle.symbolicName + "_" + bundle.version);
             if (!Files.exists(p)) {
-                try (ZipFile z = new ZipFile(b.path.toFile())) {
+                try (ZipFile z = new ZipFile(bundle.path.toFile())) {
                     z.stream().forEach(e -> {
                         Path ep = p.resolve(e.getName());
                         if (e.isDirectory()) {
-                            try {
-                                Files.createDirectories(ep);
-                            } catch (IOException e1) {
-                                throw new RuntimeException(e1);
-                            }
+                            createDirectories(ep);
+
                         } else {
                             if (!Files.exists(ep.getParent())) {
-                                try {
-                                    Files.createDirectories(ep.getParent());
-                                } catch (IOException e1) {
-                                    throw new RuntimeException(e1);
-                                }
+                                createDirectories(ep.getParent());
                             }
+
                             try (OutputStream out = Files.newOutputStream(ep);
                                  InputStream in = z.getInputStream(e)) {
                                 byte[] buf = new byte[1024];
@@ -136,17 +130,17 @@ class BundleInfoGenerator {
         } else if (configuration.getVmProperties().containsKey(OSGI_FRAMEWORK_EXTENSIONS)) {
             List<String> extensions = Arrays.asList(((String) configuration.getVmProperties().get(OSGI_FRAMEWORK_EXTENSIONS)).split(","));
 
-            if ("org.eclipse.osgi".equals(b.symbolicName)
-                    || extensions.stream().anyMatch(v -> v.trim().equals(b.symbolicName))) {
+            if ("org.eclipse.osgi".equals(bundle.symbolicName)
+                    || extensions.stream().anyMatch(v -> v.trim().equals(bundle.symbolicName))) {
                 try {
                     if (!Files.exists(explodeDir)) {
-                        Files.createDirectories(explodeDir);
+                        createDirectories(explodeDir);
                     }
 
-                    Path targetFile = explodeDir.resolve(b.path.getFileName());
-                    Files.copy(b.path, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                    Path targetFile = explodeDir.resolve(bundle.path.getFileName());
+                    Files.copy(bundle.path, targetFile, StandardCopyOption.REPLACE_EXISTING);
 
-                    if (!"org.eclipse.osgi".equals(b.symbolicName)) {
+                    if (!"org.eclipse.osgi".equals(bundle.symbolicName)) {
                         extensionPaths.add(targetFile);
                     }
 
@@ -156,6 +150,14 @@ class BundleInfoGenerator {
                 }
             }
         }
-        return b.path.toAbsolutePath();
+        return bundle.path.toAbsolutePath();
+    }
+
+    private void createDirectories(Path ep) {
+        try {
+            Files.createDirectories(ep);
+        } catch (IOException e1) {
+            throw new RuntimeException(e1);
+        }
     }
 }
