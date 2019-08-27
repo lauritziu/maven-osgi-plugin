@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>at.bestsolution</groupId>
 	<artifactId>maven-osgi-modules</artifactId>
-	<version>0.0.3.FORUM1</version>
+	<version>0.0.3.FORUM2</version>
 	<packaging>pom</packaging>
 
 	<properties>
@@ -25,6 +25,16 @@
 	    <module>maven-osgi-targetplatform-plugin</module>
 	</modules>
 
+	<dependencyManagement>
+		<dependencies>
+			<!--  mockito is now java 11 compatible -->
+			<dependency>
+				<groupId>org.mockito</groupId>
+				<artifactId>mockito-core</artifactId>
+				<version>3.0.0</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<profiles>
 		<profile>

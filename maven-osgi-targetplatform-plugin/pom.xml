@@ -3,13 +3,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>at.bestsolution</groupId>
 	<artifactId>maven-osgi-targetplatform-plugin</artifactId>
-	<version>0.0.3.FORUM1</version>
+	<version>0.0.3.FORUM2</version>
 	<packaging>maven-plugin</packaging>
 	
 	<parent>
 		<groupId>at.bestsolution</groupId>
 		<artifactId>maven-osgi-modules</artifactId>
-		 <version>0.0.3.FORUM1</version>
+		 <version>0.0.3.FORUM2</version>
 	</parent>
 
 	<name>Maven OSGi Target Platform Plug-in</name>
@@ -22,7 +22,6 @@
 		<pde.core.version>3.11.1</pde.core.version>
 		<junit.version>4.8.2</junit.version>
 		<hamcrest.version>2.0.0.0</hamcrest.version>
-		<mockito.core.version>2.7.22</mockito.core.version>
 		<commons.cli.version>1.4</commons.cli.version>
 	</properties>
 
@@ -114,7 +113,6 @@
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
-			<version>${mockito.core.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
