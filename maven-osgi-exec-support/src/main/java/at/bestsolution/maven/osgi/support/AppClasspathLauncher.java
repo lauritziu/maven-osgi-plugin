@@ -72,6 +72,8 @@ public class AppClasspathLauncher {
 
     private Optional<Path> ymlConfigPath;
 
+    /** controls skipping empty classpath entries */
+    private final boolean skipEmptyElements = true;
 
     /**
      * TODO: following parameters are need to be processed:
@@ -283,7 +285,7 @@ public class AppClasspathLauncher {
     }
 
     private Set<Bundle> findAllBundlesInClasspath() {
-        return Arrays.asList(getClasspath()).stream()
+        return getClasspath().stream()
                 .map(this::mapToBundle)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -344,19 +346,43 @@ public class AppClasspathLauncher {
         }
     }
 
-    private static URL[] getClasspath() {
-        ClassLoader classLoader = AppClasspathLauncher.class.getClassLoader();
+    private List<URL> getClasspath() {
+        String classpath = System.getProperty("java.class.path");
 
-        if (!(classLoader instanceof URLClassLoader)) {
-            throw new IllegalArgumentException("Only classloader instances of type " + URLClassLoader.class + " are supported");
+        ArrayList<URL> path = new ArrayList<>();
+        if (classpath != null) {
+            // map each element of class path to a file URL
+            int off = 0, next;
+            do {
+                next = classpath.indexOf(File.pathSeparator, off);
+                String element = (next == -1)
+                        ? classpath.substring(off)
+                        : classpath.substring(off, next);
+                if (!element.isEmpty() || !skipEmptyElements) {
+                    URL url = toFileURL(element);
+                    if (url != null) path.add(url);
+                }
+                off = next + 1;
+            } while (next != -1);
         }
-
-        URL[] urls = ((URLClassLoader) classLoader).getURLs();
 
         // TODO: support filtering
 
-        return urls;
+        return path;
     }
+
+    /**
+     * Returns a file URL for the given file path.
+     */
+    private URL toFileURL(String s) {
+        try {
+            File f = new File(s).getCanonicalFile();
+            return f.toURI().toURL();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
 
     //----------------------------------------
     // Configuration class filled with yaml configuration
